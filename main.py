@@ -126,10 +126,12 @@ class Box(Object):
 class Scene:
     def __init__(self,resolution=256):
         obj1 = Sphere(1.5,[0,0,20])
-        obj2 = Box(np.array([5,1,5]),np.array([0,-3,20]))
+        obj2 = Box(np.array([5,1,20]),np.array([0,-3,20]))
         # obj1.set_material(DiffuseMaterial(np.array([255,0,0])))
-        obj2.set_material(BRDF(np.array([1,0,0]),np.array([0.6,0.6,0.6]),0.1))
-        obj1.set_material(BRDF(np.array([0,1,0]),np.array([0.6,0.6,0.6]),0.1))
+        # obj2.set_material(BRDF(np.array([1,0,0]),np.array([0.6,0.6,0.6]),0.1))
+        obj2.set_material(BRDF(np.array([0.9,0.9,0.9]),np.array([0.7,0.7,0.7]),0.1))
+        # obj1.set_material(BRDF(np.array([0,1,0]),np.array([0.7,0.7,0.7]),0.1))
+        obj1.set_material(BRDF(np.array([230/255,180/255,34/255]),np.array([0.6,0.6,0.6]),0.1))
         # obj2.set_material(BRDF(np.array([1,1,0]),np.array([0.02,0.02,0.02]),0.1))
         # obj1.set_material(GlowMaterial(np.array([0,1,1]),2))
         # obj1.set_material(BasicMaterial(1,np.array([1,0,0]),np.array([1,1,1]),30))
@@ -145,14 +147,6 @@ class Scene:
     
     def render(self,camera):
         self.cam = camera
-        # with Pool(8) as p:
-        #     ret = p.starmap(self.marching, self.arg_ij)
-        # with Pool(8) as p:
-        #     ret2 = p.starmap(self.hitcolor,ret)
-        # for r in ret2:
-        #     self.img[r[0]][r[1]][0] += np.clip(r[2][0],0,1)*255
-        #     self.img[r[0]][r[1]][1] += np.clip(r[2][1],0,1)*255
-        #     self.img[r[0]][r[1]][2] += np.clip(r[2][2],0,1)*255
 
         with Pool(8) as p:
             ret3 = p.starmap(self.cast_ray,self.arg_ij)
@@ -189,7 +183,6 @@ class Scene:
     def is_hit(self,origin,ray):
         totdis = 0
         hitflag = -1
-        numobj = len(self.objs)
 
         while totdis < self.maxdis:
             rayhead = origin + ray*totdis
@@ -204,30 +197,35 @@ class Scene:
         return hitflag
 
     def cast_ray(self,i,j):
-        #i,jは一旦置いておく
-        #rayのcolorは((1-shadow)*light+AO)*BRDF + glow
-        # lightは照明光と反射先のカラー。反射光は鏡面反射部分にしかかからない？→いやかかっていいはず。
-        # glowは照明扱いしなくちゃホントはあかんけど、減衰が強いってことで無かったことに…(だるい)
         
         tx,ty = self.step*j-1,-self.step*i+1
         ray = self.cam.ray(tx,ty)
         origin = self.cam.pos
-        totcol = np.array([0,0,0])
-        reflection_max = 1
-        for loop in range(reflection_max):
-            hitflag,totdis,shortest2objs = self.ray_marching(origin,ray)
-            if hitflag == -1:
-                break
-            else:
-                hitpos = origin + ray*totdis
-                n,v = self.objs[hitflag].mat_vecs(hitpos,origin)
-                hitpos = hitpos + n*0.02
-                # refv = self.reflect(v,n)
-                for light in self.lights:
-                    lv,lpow = light.lighting(hitpos)
-                    totcol = totcol + self.hcolor(hitflag,hitpos,n,v,lv,lpow) #BRDF
-                totcol = totcol + self.gcolor(hitflag,origin,shortest2objs) #GLOW
+        totcol = self.color(1,3,origin,ray)
+
         return [i,j,totcol]
+
+    def color(self,rnum,rmax,origin,ray):
+        hitflag,totdis,shortest2objs = self.ray_marching(origin,ray)
+        totcol = np.array([0,0,0])
+        if hitflag == -1:
+            return totcol
+        else:
+            hitpos = origin + ray*totdis
+            n,v = self.objs[hitflag].mat_vecs(hitpos,origin)
+            hitpos = hitpos + n*0.02
+            for light in self.lights:
+                lv,lpow = light.lighting(hitpos)
+                totcol = totcol + self.hcolor(hitflag,hitpos,n,v,lv,lpow) #BRDF
+            totcol = totcol + self.gcolor(hitflag,origin,shortest2objs) #GLOW
+
+            if rnum < rmax:
+                refv = self.reflect(v,n)
+                refcol = self.color(rnum+1,rmax,hitpos,refv)
+                totcol = totcol + refcol
+            
+            return totcol
+            
         
     
     def reflect(self,v,n):
