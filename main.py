@@ -6,6 +6,7 @@ import itertools
 """
 フォーカルブラー
 ぐろー
+右手系になりました！！！！！
 """
 
 class Camera:
@@ -19,10 +20,10 @@ class Camera:
         self.up = np.array([0,1,0])
         self.vAngle = 30*np.pi/180
         self.vAHalf = self.vAngle/2
-        self.vScreenZ=1/np.tan(self.vAHalf)
+        self.vScreenY=1/np.tan(self.vAHalf)
 
-    def ray(self,x,y):
-        base = np.array([x,y,self.vScreenZ])
+    def ray(self,x,z):
+        base = np.array([x,self.vScreenY,z])
         return base/np.linalg.norm(base)
 
 class BRDF:
@@ -125,8 +126,9 @@ class Box(Object):
 
 class Scene:
     def __init__(self,resolution=256):
-        obj1 = Sphere(1.5,[0,0,20])
-        obj2 = Box(np.array([5,1,20]),np.array([0,-3,20]))
+        # obj1 = Sphere(1.5,[0,0,20])
+        obj1 = Box(np.array([2,2,2]),np.array([0,20,0]))
+        obj2 = Box(np.array([5,20,1]),np.array([0,20,-3]))
         # obj1.set_material(DiffuseMaterial(np.array([255,0,0])))
         # obj2.set_material(BRDF(np.array([1,0,0]),np.array([0.6,0.6,0.6]),0.1))
         obj2.set_material(BRDF(np.array([0.9,0.9,0.9]),np.array([0.7,0.7,0.7]),0.1))
@@ -136,12 +138,13 @@ class Scene:
         # obj1.set_material(GlowMaterial(np.array([0,1,1]),2))
         # obj1.set_material(BasicMaterial(1,np.array([1,0,0]),np.array([1,1,1]),30))
         self.objs = [obj1,obj2]
-        self.lights = [DirectionalLight(np.array([1,-1,1]),np.array([5,5,5]))]
+        self.lights = [DirectionalLight(np.array([1,1,-1]),np.array([5,5,5]))]
         self.img = np.array([[[0,0,0] for i in range(resolution)] for j in range(resolution)]).astype(np.uint8)
         self.step = 2/resolution
         self.maxdis = 100
         self.mindis = 0.001
         self.resolutuon = resolution
+        self.reflection_max = 1
         self.cam = None
         self.arg_ij = itertools.product(range(self.resolutuon),range(self.resolutuon))
     
@@ -198,10 +201,10 @@ class Scene:
 
     def cast_ray(self,i,j):
         
-        tx,ty = self.step*j-1,-self.step*i+1
-        ray = self.cam.ray(tx,ty)
+        tx,tz = self.step*j-1,-self.step*i+1
+        ray = self.cam.ray(tx,tz)
         origin = self.cam.pos
-        totcol = self.color(1,3,origin,ray)
+        totcol = self.color(1,self.reflection_max,origin,ray)
 
         return [i,j,totcol]
 
