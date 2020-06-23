@@ -2,11 +2,15 @@ import numpy as np
 from PIL import Image
 from multiprocessing import Pool
 import itertools
+from scipy.spatial.transform import Rotation
 
 """
 フォーカルブラー
 ぐろー
 右手系になりました！！！！！
+
+rotvec = np.array([0, np.pi/2, np.pi/3])
+rot = Rotation.from_rotvec(rotvec)
 """
 
 class Camera:
@@ -96,6 +100,14 @@ class Object:
 
     def set_material(self,mat):
         self.mat = mat
+    
+    def rotate(self,x):
+        """
+        xは回転ベクトルの性質上、物体中心からの相対ベクトルである必要がある。
+        回転はローカル回転なので、マイナスを取る。
+        """
+        rot_obj = Rotation.from_rotvec(-self.rot)
+        return rot_obj.apply(x)
 
 class DirectionalLight:
     def __init__(self,direction,power):
@@ -118,8 +130,11 @@ class Box(Object):
     def __init__(self,halfsize,pos):
         self.size = halfsize
         self.pos = pos
+        self.rot = np.array([0,0,0])
     def dist(self,x):
-        p = np.abs(x-self.pos)
+        xdiff = x-self.pos
+        xdiff = self.rotate(xdiff)
+        p = np.abs(xdiff)
         hoge = np.clip(p-self.size,0,100000000)
         return np.sqrt(np.dot(hoge,hoge))
 
@@ -127,7 +142,8 @@ class Box(Object):
 class Scene:
     def __init__(self,resolution=256):
         # obj1 = Sphere(1.5,[0,0,20])
-        obj1 = Box(np.array([2,2,2]),np.array([0,20,0]))
+        obj1 = Box(np.array([1.5,1.5,1.5]),np.array([2,20,0]))
+        obj1.rot = np.array([0,0,np.pi/4])
         obj2 = Box(np.array([5,20,1]),np.array([0,20,-3]))
         # obj1.set_material(DiffuseMaterial(np.array([255,0,0])))
         # obj2.set_material(BRDF(np.array([1,0,0]),np.array([0.6,0.6,0.6]),0.1))
